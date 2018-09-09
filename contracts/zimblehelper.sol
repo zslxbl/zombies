@@ -1,49 +1,29 @@
 pragma solidity ^0.4.19;
 
-import "./zombiefeeding.sol";
+import "./zombiehelper.sol";
 
-contract ZombieHelper is ZombieFeeding {
+contract ZombieBattle is ZombieHelper {
+    uint randNonce = 0;
+    uint attackVictoryProbability = 70;
 
-    uint levelUpFee = 0.001 ether;
-
-    modifier aboveLevel(uint _level, uint _zombieId) {
-        require(zombies[_zombieId].level >= _level);
-        _;
+    function randMod(uint _modulus) internal returns (uint) {
+        randNonce++;
+        return uint(keccak256(now, msg.sender, randNonce)) % _modulus;
     }
 
-    function withdraw() external onlyOwner {
-        owner.transfer(this.balance);
-    }
-
-    function setLevelUpFee(uint _fee) external onlyOwner {
-        levelUpFee = _fee;
-    }
-
-    function levelUp(uint _zombieId) external payable {
-        require(msg.value == levelUpFee);
-        zombies[_zombieId].level++;
-    }
-
-    function changeName(uint _zombieId, string _newName) external aboveLevel(2, _zombieId) {
-        require(msg.sender == zombieToOwner[_zombieId]);
-        zombies[_zombieId].name = _newName;
-    }
-
-    function changeDna(uint _zombieId, uint _newDna) external aboveLevel(20, _zombieId) {
-        require(msg.sender == zombieToOwner[_zombieId]);
-        zombies[_zombieId].dna = _newDna;
-    }
-
-    function getZombiesByOwner(address _owner) external view returns(uint[]) {
-        uint[] memory result = new uint[](ownerZombieCount[_owner]);
-        uint counter = 0;
-        for (uint i = 0; i < zombies.length; i++) {
-            if (zombieToOwner[i] == _owner) {
-                result[counter] = i;
-                counter++;
-            }
+    function attack(uint _zombieId, uint _targetId) external onlyOwnerOf(_zombieId) {
+        Zombie storage myZombie = zombies[_zombieId];
+        Zombie storage enemyZombie = zombies[_targetId];
+        uint rand = randMod(100);
+        if (rand <= attackVictoryProbability) {
+            myZombie.winCount++;
+            myZombie.level++;
+            enemyZombie.lossCount++;
+            feedAndMultiply(_zombieId, enemyZombie.dna, "zombie");
+        } else {
+            myZombie.lossCount++;
+            enemyZombie.winCount++;
+            _triggerCooldown(myZombie);
         }
-        return result;
     }
-
 }
